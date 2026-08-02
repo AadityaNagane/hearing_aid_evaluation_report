@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Summarization Evaluation: Omni vs Cascaded</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  :root {
+    --bg: #fdfdfc;
+    --surface-0: #f1efe8;
+    --surface-1: #ffffff;
+    --border: #e1e0d9;
+    --border-strong: #d1d0c9;
+    --border-stronger: #a1a09a;
+    --text-primary: #1a1a1a;
+    --text-secondary: #5a5a5a;
+    --text-muted: #898781;
+    --text-success: #0c7c34;
+    --text-danger: #c0392b;
+    --radius: 8px;
+    font-family: system-ui, -apple-system, sans-serif;
+  }
+  
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text-primary); line-height: 1.5; padding: 2rem; }
+  .wrap { max-width: 1000px; margin: 0 auto; }
+  
+  h1 { font-size: 1.5rem; margin-bottom: 0.5rem; }
+  
+  /* Info Card */
+  .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 2rem; }
+  .info-card {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.25rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+  }
+  .info-card.full-width { grid-column: 1 / -1; }
+  .info-card h3 { font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin-bottom: 0.75rem; }
+  .info-card p { font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 0.75rem; }
+  .info-card p:last-child { margin-bottom: 0; }
+  .code-formula { background: var(--surface-0); padding: 2px 6px; border-radius: 4px; font-family: monospace; font-size: 0.85rem; color: var(--text-primary); }
+  
+  .arch-flex { display: flex; gap: 24px; flex-wrap: wrap; margin-bottom: 1rem; }
+  .arch-col { flex: 1; min-width: 300px; }
+
+  .arch-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  .badge-omni { background: #e8ebf5; color: #5c4d9a; }
+  .badge-cascade { background: #fbeee6; color: #d35400; }
+
+  @media(max-width: 768px) { .info-grid { grid-template-columns: 1fr; } }
+
+  /* Controls */
+  .legend { display: flex; flex-wrap: wrap; gap: 16px; margin-bottom: 1.5rem; font-size: 13px; color: var(--text-secondary); }
+  .legend span { display: flex; align-items: center; gap: 6px; font-weight: 500; }
+  .dot { width: 12px; height: 12px; border-radius: 3px; flex-shrink: 0; }
+  
+  .tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 1.5rem; border-bottom: 1px solid var(--border); padding-bottom: 1rem; }
+  .tab { padding: 6px 16px; font-size: 14px; font-weight: 500; border-radius: var(--radius); border: 1px solid var(--border-strong); background: var(--surface-1); color: var(--text-secondary); cursor: pointer; transition: all .2s; }
+  .tab.active { background: #1a1a1a; color: #fff; border-color: #1a1a1a; }
+  .tab:hover:not(.active) { background: var(--surface-0); }
+  
+  /* Sections */
+  .section { display: none; }
+  .section.visible { display: block; animation: fadeIn 0.3s ease; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+  
+  .section-label { font-size: 13px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--text-primary); margin-bottom: .75rem; margin-top: 1.5rem; }
+  
+  /* Tables */
+  .tbl-wrap { overflow-x: auto; background: var(--surface-1); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 2rem; }
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; min-width: 850px; }
+  thead th { font-size: 11px; font-weight: 600; text-transform: uppercase; color: var(--text-muted); padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border); background: var(--surface-0); }
+  thead th:not(:first-child) { text-align: right; }
+  tbody td { padding: 10px 12px; border-bottom: 1px solid var(--border); color: var(--text-primary); vertical-align: middle; }
+  tbody td:not(:first-child) { text-align: right; font-variant-numeric: tabular-nums; }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover { background: #faf9f6; }
+  
+  .model-name { font-weight: 600; white-space: nowrap; }
+  .bar-cell { display: flex; align-items: center; gap: 8px; justify-content: flex-end; }
+  .bar-bg { width: 45px; height: 6px; border-radius: 3px; background: var(--surface-0); overflow: hidden; flex-shrink: 0; }
+  .bar-fill { height: 100%; border-radius: 3px; transition: width 0.5s ease; }
+  .val { min-width: 38px; text-align: right; font-variant-numeric: tabular-nums; }
+  .best { color: var(--text-success); font-weight: 600; background: #e8f5ed; padding: 2px 4px; border-radius: 4px; }
+  .worst { color: var(--text-danger); }
+  
+  /* Charts */
+  .metric-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 1rem; }
+  .mtab { padding: 4px 12px; font-size: 13px; border-radius: var(--radius); border: 1px solid var(--border-strong); background: var(--surface-1); color: var(--text-secondary); cursor: pointer; }
+  .mtab.active { background: var(--surface-0); color: var(--text-primary); border-color: var(--border-stronger); font-weight: 500; }
+  
+  .chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 1.5rem; }
+  .chart-card { background: var(--surface-1); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.25rem; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
+  .chart-title { font-size: 13px; font-weight: 600; color: var(--text-primary); margin-bottom: 1rem; text-align: center; }
+  .chart-wrap { position: relative; height: 260px; }
+  .chart-wrap.tall { height: 380px; }
+  
+  @media(max-width: 650px) { .chart-grid { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <h1>Omni-Qwen vs. Cascaded Summarization Pipeline</h1>
+  
+  <div class="info-grid">
+    <div class="info-card full-width">
+      <h3>Model Architectures</h3>
+      <div class="arch-flex">
+        <div class="arch-col">
+          <span class="arch-badge badge-omni">Omni-Qwen</span>
+          <p><b>Layer 1: Audio Encoder</b><br>OpenAI Whisper Base Encoder processing 16kHz mono waveforms. Mel-spectrogramming, Conv2D downsampling.</p>
+          <p><b>Layer 2: Speech Projector</b><br>EncoderProjectorConcat reduces dimensionality. Groups frames and maps to LLM hidden size. <em>~6.6M params.</em></p>
+          <p><b>Layer 3: Speech-Text LLM</b><br>Qwen2.5-0.5B-Instruct. Speech embeddings are concatenated directly with text tokens in the forward pass. <em>~2.0M Trainable LoRA Params.</em></p>
+        </div>
+        <div class="arch-col" style="border-left: 1px solid var(--border); padding-left: 20px;">
+          <span class="arch-badge badge-cascade">Traditional Cascaded Pipeline</span>
+          <p><b>Step 1: ASR (Audio to Text)</b><br>Input audio is processed by standard <i>Whisper</i> to generate a raw intermediate transcript. Subject to standard WER errors.</p>
+          <p><b>Step 2: LLM Summarization</b><br>The raw transcript string is fed as a text prompt into an independent text model (<b>BERT</b>, <b>FLAN-T5</b>, or <b>Qwen</b>).</p>
+          <p><b>Trade-offs:</b><br>Loss of acoustic context (tone, prosody) at the text boundary. ASR hallucination errors propagate heavily into the final LLM summary.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="info-card">
+      <h3>Evaluation Metrics</h3>
+      <p><b>ROUGE F1 Scores:</b> Measures n-gram overlap. R1 = unigrams, R2 = bigrams, RL = longest common subsequence.</p>
+      <p><b>Semantic Similarity:</b> Cosine similarity of Sentence-BERT embeddings. <span class="code-formula">sim = (v_pred · v_ref) / (||v_pred|| × ||v_ref||)</span></p>
+      <p><b>Compression Performed (%):</b> Percentage of the original word count that was reduced/removed. <span class="code-formula">(1 - length(pred)/length(ref)) × 100</span>. Ideal target reduction is ~50%.</p>
+    </div>
+
+    <div class="info-card">
+      <h3>System & Hardware Profile</h3>
+      <p><b>System:</b> HP Victus Gaming Laptop 15-fa2xxx</p>
+      <p><b>OS:</b> Windows 11 Home (Build 26200)</p>
+      <p><b>CPU:</b> Intel® Core™ i5-14450HX (10 Cores, 16 Threads, 2.40 GHz base)</p>
+      <p><b>Memory:</b> 24.0 GB Installed Physical RAM</p>
+      <p><b>GPU:</b> NVIDIA GeForce RTX 3050 (6GB VRAM)</p>
+      <p><b>Acceleration:</b> CUDA 13.1 (Driver 592.27)</p>
+      <p style="margin-top: 10px; font-size: 0.82rem; color: var(--text-muted);"><em>*Note: Switchboard cascaded Qwen latency spiked heavily due to context window scaling with longer intermediate transcripts.</em></p>
+    </div>
+  </div>
+
+  <div class="legend">
+    <span><span class="dot" style="background:#5c4d9a"></span>Omni-Qwen Mk1</span>
+    <span><span class="dot" style="background:#208b5e"></span>Omni-Qwen Mk2</span>
+    <span><span class="dot" style="background:#d64040"></span>Cascaded FLAN-T5</span>
+    <span><span class="dot" style="background:#e67e22"></span>Cascaded Qwen</span>
+    <span><span class="dot" style="background:#0984e3"></span>Cascaded BERT</span>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" onclick="showTab('table')">Dataset Comparison Tables</button>
+    <button class="tab" onclick="showTab('charts')">Metric Analysis (Bars)</button>
+    <button class="tab" onclick="showTab('scatter')">Correlation Analysis (Relations)</button>
+  </div>
+
+  <div id="sec-table" class="section visible">
+    <div id="dataset-tables-container"></div>
+  </div>
+
+  <div id="sec-charts" class="section">
+    <div class="metric-tabs">
+      <button class="mtab active" onclick="switchMetric('r1')">ROUGE-1</button>
+      <button class="mtab" onclick="switchMetric('r2')">ROUGE-2</button>
+      <button class="mtab" onclick="switchMetric('rl')">ROUGE-L</button>
+      <button class="mtab" onclick="switchMetric('sim')">Similarity</button>
+      <button class="mtab" onclick="switchMetric('comp')">Compression (%)</button>
+      <button class="mtab" onclick="switchMetric('lat')">Latency</button>
+    </div>
+    <div class="chart-grid" id="chart-grid"></div>
+  </div>
+
+  <div id="sec-scatter" class="section">
+    <div class="chart-grid">
+      <div class="chart-card" style="grid-column: 1 / -1;">
+        <div class="chart-title">Compression Performed vs. Semantic Similarity</div>
+        <p style="font-size: 13px; color: var(--text-secondary); text-align: center; margin-top:-8px; margin-bottom: 12px;">Assessing if compressing text more aggressively (higher %) results in lost semantic fidelity across datasets.</p>
+        <div class="chart-wrap tall"><canvas id="scatter-comp-sim"></canvas></div>
+      </div>
+      
+      <div class="chart-card" style="grid-column: 1 / -1;">
+        <div class="chart-title">Compression Performed vs. ROUGE-L</div>
+        <p style="font-size: 13px; color: var(--text-secondary); text-align: center; margin-top:-8px; margin-bottom: 12px;">Evaluating how higher text reduction correlates with n-gram sequence preservation.</p>
+        <div class="chart-wrap tall"><canvas id="scatter-comp-rl"></canvas></div>
+      </div>
+
+      <div class="chart-card" style="grid-column: 1 / -1;">
+        <div class="chart-title">Semantic Similarity vs. ROUGE-L</div>
+        <p style="font-size: 13px; color: var(--text-secondary); text-align: center; margin-top:-8px; margin-bottom: 12px;">Evaluating the correlation between strict n-gram sequence matching (ROUGE-L) and generalized meaning preservation (Similarity).</p>
+        <div class="chart-wrap tall"><canvas id="scatter-sim-rl"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const models   = ['Omni-Qwen Mk1', 'Omni-Qwen Mk2', 'Cascaded FLAN-T5', 'Cascaded Qwen', 'Cascaded BERT'];
+const datasets = ['AMI', 'Switchboard', 'TED-LIUM'];
+
+// Data definition
+const dataR1 = {
+  'Omni-Qwen Mk1': [57.4, 69.5, 63.8],
+  'Omni-Qwen Mk2': [60.1, 72.3, 66.2],
+  'Cascaded FLAN-T5': [26.8, 27.9, 31.5],
+  'Cascaded Qwen': [34.3, 36.0, 40.0],
+  'Cascaded BERT': [33.8, 35.5, 45.2],
+};
+const dataR2 = {
+  'Omni-Qwen Mk1': [38.5, 49.6, 42.1],
+  'Omni-Qwen Mk2': [41.2, 51.8, 44.9],
+  'Cascaded FLAN-T5': [17.6, 18.3, 23.1],
+  'Cascaded Qwen': [14.5, 15.3, 19.5],
+  'Cascaded BERT': [23.2, 24.2, 37.0],
+};
+const dataRL = {
+  'Omni-Qwen Mk1': [54.2, 66.1, 60.5],
+  'Omni-Qwen Mk2': [56.8, 68.7, 63.1],
+  'Cascaded FLAN-T5': [24.6, 25.8, 28.3],
+  'Cascaded Qwen': [27.9, 28.4, 31.8],
+  'Cascaded BERT': [28.1, 29.0, 38.0],
+};
+const dataSim = {
+  'Omni-Qwen Mk1': [68.3, 81.2, 75.4],
+  'Omni-Qwen Mk2': [71.5, 83.6, 78.1],
+  'Cascaded FLAN-T5': [40.8, 46.6, 58.1],
+  'Cascaded Qwen': [57.5, 63.5, 75.2],
+  'Cascaded BERT': [49.2, 54.2, 67.9],
+};
+
+// Compression is now (% reduced): (1 - ratio) * 100
+const dataComp = {
+  'Omni-Qwen Mk1': [45.0, 38.0, 49.0], 
+  'Omni-Qwen Mk2': [51.0, 42.0, 53.0], 
+  'Cascaded FLAN-T5': [76.0, 76.0, 75.0], 
+  'Cascaded Qwen': [66.0, 66.0, 67.0], 
+  'Cascaded BERT': [66.0, 67.0, 64.0], 
+};
+const dataLat = {
+  'Omni-Qwen Mk1': [1.45, 1.83, 1.95],
+  'Omni-Qwen Mk2': [1.38, 1.68, 1.80],
+  'Cascaded FLAN-T5': [2.22, 1.81, 2.37],
+  'Cascaded Qwen': [1.06, 6.98, 1.20],
+  'Cascaded BERT': [1.24, 1.22, 2.06],
+};
+
+const colors = {
+  'Omni-Qwen Mk1': '#5c4d9a',
+  'Omni-Qwen Mk2': '#208b5e',
+  'Cascaded FLAN-T5': '#d64040',
+  'Cascaded Qwen': '#e67e22',
+  'Cascaded BERT': '#0984e3',
+};
+
+const metricsConfig = [
+  { id: 'r1', name: 'ROUGE-1', data: dataR1, max: 100, unit: '%' },
+  { id: 'r2', name: 'ROUGE-2', data: dataR2, max: 100, unit: '%' },
+  { id: 'rl', name: 'ROUGE-L', data: dataRL, max: 100, unit: '%' },
+  { id: 'sim', name: 'Similarity', data: dataSim, max: 100, unit: '%' },
+  { id: 'comp', name: 'Compression', data: dataComp, max: 100, unit: '%' },
+  { id: 'lat', name: 'Latency', data: dataLat, max: 7.5, unit: 's' }
+];
+
+// --- LOGIC FOR DATASET TABLES ---
+function getBestWorst(datasetIdx, metricObj) {
+  let bestModel, worstModel;
+  
+  if (metricObj.id === 'comp') {
+    // Target optimal for compression is around ~50%
+    bestModel = models.reduce((a, b) => Math.abs(metricObj.data[a][datasetIdx] - 50) < Math.abs(metricObj.data[b][datasetIdx] - 50) ? a : b);
+    worstModel = models.reduce((a, b) => Math.abs(metricObj.data[a][datasetIdx] - 50) > Math.abs(metricObj.data[b][datasetIdx] - 50) ? a : b);
+  } else if (metricObj.id === 'lat') {
+    // Lower is better for latency
+    bestModel = models.reduce((a, b) => metricObj.data[a][datasetIdx] < metricObj.data[b][datasetIdx] ? a : b);
+    worstModel = models.reduce((a, b) => metricObj.data[a][datasetIdx] > metricObj.data[b][datasetIdx] ? a : b);
+  } else {
+    // Higher is better for accuracy scores
+    bestModel = models.reduce((a, b) => metricObj.data[a][datasetIdx] > metricObj.data[b][datasetIdx] ? a : b);
+    worstModel = models.reduce((a, b) => metricObj.data[a][datasetIdx] < metricObj.data[b][datasetIdx] ? a : b);
+  }
+  return { best: metricObj.data[bestModel][datasetIdx], worst: metricObj.data[worstModel][datasetIdx] };
+}
+
+function buildDatasetTables() {
+  const container = document.getElementById('dataset-tables-container');
+  container.innerHTML = '';
+  
+  datasets.forEach((ds, dsIdx) => {
+    // Label
+    const title = document.createElement('p');
+    title.className = 'section-label';
+    title.innerText = `${ds} Dataset Performance`;
+    container.appendChild(title);
+    
+    // Table Setup
+    const wrap = document.createElement('div');
+    wrap.className = 'tbl-wrap';
+    const table = document.createElement('table');
+    
+    // Header
+    const thead = document.createElement('thead');
+    let thHtml = `<tr><th style="width:160px">Model</th>`;
+    metricsConfig.forEach(metric => { thHtml += `<th>${metric.name} (${metric.unit})</th>`; });
+    thHtml += `</tr>`;
+    thead.innerHTML = thHtml;
+    table.appendChild(thead);
+    
+    // Body
+    const tbody = document.createElement('tbody');
+    models.forEach(m => {
+      const tr = document.createElement('tr');
+      let tdHtml = `<td class="model-name" style="color:${colors[m]}">${m}</td>`;
+      
+      metricsConfig.forEach(metric => {
+        const val = metric.data[m][dsIdx];
+        const {best, worst} = getBestWorst(dsIdx, metric);
+        
+        let cls = '';
+        if (val === best) cls = 'best';
+        else if (val === worst) cls = 'worst';
+        
+        const disp = (metric.unit === 's') ? val.toFixed(2) : val.toFixed(1);
+        const pct = Math.min((val / metric.max) * 100, 100);
+        
+        tdHtml += `<td><div class="bar-cell">
+          <span class="val ${cls}">${disp}</span>
+          <div class="bar-bg"><div class="bar-fill" style="width:${pct.toFixed(1)}%;background:${colors[m]}"></div></div>
+        </div></td>`;
+      });
+      tr.innerHTML = tdHtml;
+      tbody.appendChild(tr);
+    });
+    
+    table.appendChild(tbody);
+    wrap.appendChild(table);
+    container.appendChild(wrap);
+  });
+}
+
+// --- LOGIC FOR SCATTER PLOTS ---
+let scatterInstances = [];
+
+function buildScatterCharts() {
+  scatterInstances.forEach(c => c.destroy());
+  scatterInstances = [];
+  
+  const commonScatterOptions = (xLabel, yLabel, xSuffix, ySuffix) => ({
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { position: 'top', labels: { usePointStyle: true, boxWidth: 8, font: {size: 12} } },
+      tooltip: {
+        backgroundColor: 'rgba(0,0,0,0.8)',
+        padding: 10,
+        callbacks: {
+          label: (ctx) => {
+            return `${ctx.dataset.label} (${ctx.raw.datasetName}): X = ${ctx.raw.x.toFixed(1)}${xSuffix}, Y = ${ctx.raw.y.toFixed(1)}${ySuffix}`;
+          }
+        }
+      }
+    },
+    scales: {
+      x: { title: { display: true, text: xLabel, font: {weight: '600'} }, grid: { color: '#e1e0d9' } },
+      y: { title: { display: true, text: yLabel, font: {weight: '600'} }, grid: { color: '#e1e0d9', borderDash: [4, 4] } }
+    }
+  });
+
+  // 1. Compression vs Similarity
+  const ctx1 = document.getElementById('scatter-comp-sim').getContext('2d');
+  scatterInstances.push(new Chart(ctx1, {
+    type: 'scatter',
+    data: {
+      datasets: models.map(m => ({
+        label: m,
+        backgroundColor: colors[m],
+        borderColor: colors[m],
+        pointRadius: 6,
+        pointHoverRadius: 8,
+        data: datasets.map((ds, i) => ({
+          x: dataComp[m][i],
+          y: dataSim[m][i],
+          datasetName: ds
+        }))
+      }))
+    },
+    options: commonScatterOptions('Compression Performed (%)', 'Semantic Similarity (%)', '%', '%')
+  }));
+
+  // 2. Compression vs ROUGE-L
+  const ctx2 = document.getElementById('scatter-comp-rl').getContext('2d');
+  scatterInstances.push(new Chart(ctx2, {
+    type: 'scatter',
+    data: {
+      datasets: models.map(m => ({
+        label: m,
+        backgroundColor: colors[m],
+        borderColor: colors[m],
+        pointRadius: 6,
+        pointHoverRadius: 8,
+        data: datasets.map((ds, i) => ({
+          x: dataComp[m][i],
+          y: dataRL[m][i],
+          datasetName: ds
+        }))
+      }))
+    },
+    options: commonScatterOptions('Compression Performed (%)', 'ROUGE-L F1 Score (%)', '%', '%')
+  }));
+
+  // 3. Similarity vs ROUGE-L
+  const ctx3 = document.getElementById('scatter-sim-rl').getContext('2d');
+  scatterInstances.push(new Chart(ctx3, {
+    type: 'scatter',
+    data: {
+      datasets: models.map(m => ({
+        label: m,
+        backgroundColor: colors[m],
+        borderColor: colors[m],
+        pointRadius: 6,
+        pointHoverRadius: 8,
+        data: datasets.map((ds, i) => ({
+          x: dataSim[m][i],
+          y: dataRL[m][i],
+          datasetName: ds
+        }))
+      }))
+    },
+    options: commonScatterOptions('Semantic Similarity (%)', 'ROUGE-L F1 Score (%)', '%', '%')
+  }));
+}
+
+// --- LOGIC FOR BAR CHARTS ---
+let barChartInstances = [];
+let currentBarMetric = 'r1';
+
+function getMetricObj(key) {
+  return metricsConfig.find(m => m.id === key);
+}
+
+function buildBarCharts(metricKey) {
+  barChartInstances.forEach(c => c.destroy());
+  barChartInstances = [];
+  const grid = document.getElementById('chart-grid');
+  grid.innerHTML = '';
+  
+  const metricObj = getMetricObj(metricKey);
+
+  datasets.forEach((ds, i) => {
+    const card = document.createElement('div');
+    card.className = 'chart-card';
+    card.innerHTML = `<div class="chart-title">${ds} Dataset</div><div class="chart-wrap"><canvas id="ch_${i}"></canvas></div>`;
+    grid.appendChild(card);
+
+    const inst = new Chart(document.getElementById('ch_' + i), {
+      type: 'bar',
+      data: {
+        labels: models,
+        datasets: [{
+          data: models.map(m => metricObj.data[m][i]),
+          backgroundColor: models.map(m => colors[m] + 'dd'),
+          borderColor: models.map(m => colors[m]),
+          borderWidth: 1,
+          borderRadius: 4,
+          hoverBackgroundColor: models.map(m => colors[m]),
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: 'rgba(0,0,0,0.8)',
+            padding: 10,
+            callbacks: { label: c => ` ${c.parsed.y.toFixed(metricObj.unit==='s'?2:1)}${metricObj.unit}` }
+          }
+        },
+        scales: {
+          x: {
+            ticks: {
+              font: { size: 10 }, color: '#5a5a5a',
+              callback: function(val, idx) {
+                const name = models[idx];
+                if (name.includes('FLAN-T5')) return ['Cascaded', 'FLAN-T5'];
+                if (name.includes('Cascaded Qwen')) return ['Cascaded', 'Qwen'];
+                if (name.includes('Cascaded BERT')) return ['Cascaded', 'BERT'];
+                const parts = name.split(' ');
+                return parts.length > 1 ? [parts[0], parts.slice(1).join(' ')] : parts[0];
+              }
+            },
+            grid: { display: false }
+          },
+          y: {
+            beginAtZero: true,
+            ticks: { font: { size: 11 }, color: '#898781', callback: v => v + metricObj.unit },
+            grid: { color: '#e1e0d9', borderDash: [4, 4] }
+          }
+        }
+      }
+    });
+    barChartInstances.push(inst);
+  });
+}
+
+function switchMetric(key) {
+  currentBarMetric = key;
+  document.querySelectorAll('.mtab').forEach(t => t.classList.remove('active'));
+  document.querySelector(`.mtab[onclick="switchMetric('${key}')"]`).classList.add('active');
+  buildBarCharts(key);
+}
+
+function showTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('visible'));
+  document.getElementById('sec-' + name).classList.add('visible');
+  document.querySelector(`.tab[onclick="showTab('${name}')"]`).classList.add('active');
+  
+  if (name === 'table') buildDatasetTables();
+  if (name === 'charts') buildBarCharts(currentBarMetric);
+  if (name === 'scatter') buildScatterCharts();
+}
+
+// Initial render
+buildDatasetTables();
+</script>
+</body>
+</html>

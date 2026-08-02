@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ASR Model Comparison</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  :root {
+    --bg: #fdfdfc;
+    --surface-0: #f1efe8;
+    --surface-1: #ffffff;
+    --border: #e1e0d9;
+    --border-strong: #d1d0c9;
+    --border-stronger: #a1a09a;
+    --text-primary: #1a1a1a;
+    --text-secondary: #5a5a5a;
+    --text-muted: #898781;
+    --text-success: #0c7c34;
+    --text-danger: #c0392b;
+    --radius: 8px;
+    font-family: system-ui, -apple-system, sans-serif;
+  }
+  
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text-primary); line-height: 1.5; padding: 2rem; }
+  .wrap { max-width: 900px; margin: 0 auto; }
+  
+  h1 { font-size: 1.5rem; margin-bottom: 0.5rem; }
+  
+  /* Info Card */
+  .info-card {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.25rem;
+    margin-bottom: 2rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+  }
+  .info-card h3 { font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin-bottom: 0.75rem; }
+  .info-card p { font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 0.75rem; }
+  .info-card p:last-child { margin-bottom: 0; }
+  .code-formula { background: var(--surface-0); padding: 2px 6px; border-radius: 4px; font-family: monospace; font-size: 0.85rem; color: var(--text-primary); }
+  
+  /* Controls */
+  .legend { display: flex; flex-wrap: wrap; gap: 16px; margin-bottom: 1.5rem; font-size: 13px; color: var(--text-secondary); }
+  .legend span { display: flex; align-items: center; gap: 6px; }
+  .dot { width: 12px; height: 12px; border-radius: 3px; flex-shrink: 0; }
+  
+  .tabs { display: flex; gap: 6px; margin-bottom: 1.5rem; border-bottom: 1px solid var(--border); padding-bottom: 1rem; }
+  .tab { padding: 6px 16px; font-size: 14px; font-weight: 500; border-radius: var(--radius); border: 1px solid var(--border-strong); background: var(--surface-1); color: var(--text-secondary); cursor: pointer; transition: all .2s; }
+  .tab.active { background: #1a1a1a; color: #fff; border-color: #1a1a1a; }
+  .tab:hover:not(.active) { background: var(--surface-0); }
+  
+  /* Sections */
+  .section { display: none; }
+  .section.visible { display: block; animation: fadeIn 0.3s ease; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+  
+  .section-label { font-size: 12px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--text-muted); margin-bottom: .75rem; margin-top: 1.5rem; }
+  
+  /* Tables */
+  .tbl-wrap { overflow-x: auto; background: var(--surface-1); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 1.5rem; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; table-layout: fixed; min-width: 600px; }
+  thead th { font-size: 11px; font-weight: 600; text-transform: uppercase; color: var(--text-muted); padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border); background: var(--surface-0); }
+  thead th:not(:first-child) { text-align: right; }
+  tbody td { padding: 12px; border-bottom: 1px solid var(--border); color: var(--text-primary); vertical-align: middle; }
+  tbody td:not(:first-child) { text-align: right; font-variant-numeric: tabular-nums; }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover { background: #faf9f6; }
+  
+  .model-name { font-weight: 600; }
+  .bar-cell { display: flex; align-items: center; gap: 8px; justify-content: flex-end; }
+  .bar-bg { width: 70px; height: 6px; border-radius: 3px; background: var(--surface-0); overflow: hidden; flex-shrink: 0; }
+  .bar-fill { height: 100%; border-radius: 3px; transition: width 0.5s ease; }
+  .val { min-width: 44px; text-align: right; font-variant-numeric: tabular-nums; }
+  .best { color: var(--text-success); font-weight: 600; background: #e8f5ed; padding: 2px 6px; border-radius: 4px; }
+  .worst { color: var(--text-danger); }
+  
+  /* Charts */
+  .metric-tabs { display: flex; gap: 6px; margin-bottom: 1rem; }
+  .mtab { padding: 4px 12px; font-size: 13px; border-radius: var(--radius); border: 1px solid var(--border-strong); background: var(--surface-1); color: var(--text-secondary); cursor: pointer; }
+  .mtab.active { background: var(--surface-0); color: var(--text-primary); border-color: var(--border-stronger); font-weight: 500; }
+  
+  .chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 1.5rem; }
+  .chart-card { background: var(--surface-1); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.25rem; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
+  .chart-title { font-size: 13px; font-weight: 600; color: var(--text-primary); margin-bottom: 1rem; text-align: center; }
+  .chart-wrap { position: relative; height: 220px; }
+  
+  @media(max-width: 650px) { .chart-grid { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <h1>ASR Model Evaluation</h1>
+  
+  <div class="info-card">
+    <h3>Metrics & Training Context</h3>
+    <p><b>Omni Phase1 (Base) Training:</b> The foundational model was trained utilizing a combination of the <i>LibriSpeech</i>, <i>VCTK</i>, and <i>Common Voice</i> datasets to establish baseline acoustic understanding.</p>
+    <p><b>What is WER?</b> Word Error Rate is the standard metric for speech recognition accuracy. It is calculated as: <span class="code-formula">WER = (Substitutions + Deletions + Insertions) / Total Words</span>. A lower WER indicates better performance.</p>
+    <p><b>What is Normalized WER?</b> Raw WER penalizes non-acoustic differences like casing ("Apple" vs "apple") or punctuation. Normalized WER applies a text standardization pipeline to both the reference and output text before calculation, providing a much truer measure of actual listening accuracy.</p>
+  </div>
+
+  <div class="legend">
+    <span><span class="dot" style="background:#2a78d6"></span>Omni Phase1</span>
+    <span><span class="dot" style="background:#eda100"></span>Whisper tiny</span>
+    <span><span class="dot" style="background:#4a3aa7"></span>Whisper base</span>
+    <span><span class="dot" style="background:#c0392b"></span>Omni2-Qwen Mk1</span>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" onclick="showTab('table')">Data Table</button>
+    <button class="tab" onclick="showTab('charts')">Visual Charts</button>
+  </div>
+
+  <div id="sec-table" class="section visible">
+    <p class="section-label">Normalized WER (%) — Truest measure of acoustic accuracy</p>
+    <div class="tbl-wrap"><table><thead><tr>
+      <th style="width:130px">Model</th>
+      <th>AMI</th><th>Common Voice</th><th>LibriSpeech</th><th>Switchboard</th><th>TED-LIUM</th>
+    </tr></thead><tbody id="norm-body"></tbody></table></div>
+
+    <p class="section-label">Raw WER (%) — Includes formatting/casing artifacts</p>
+    <div class="tbl-wrap"><table><thead><tr>
+      <th style="width:130px">Model</th>
+      <th>AMI</th><th>Common Voice</th><th>LibriSpeech</th><th>Switchboard</th><th>TED-LIUM</th>
+    </tr></thead><tbody id="raw-body"></tbody></table></div>
+
+    <p class="section-label">Average Inference Latency (Seconds)</p>
+    <div class="tbl-wrap"><table><thead><tr>
+      <th style="width:130px">Model</th>
+      <th>AMI</th><th>Common Voice</th><th>LibriSpeech</th><th>Switchboard</th><th>TED-LIUM</th>
+    </tr></thead><tbody id="lat-body"></tbody></table></div>
+  </div>
+
+  <div id="sec-charts" class="section">
+    <div class="metric-tabs">
+      <button class="mtab active" onclick="switchMetric('norm')">Normalized WER</button>
+      <button class="mtab" onclick="switchMetric('raw')">Raw WER</button>
+      <button class="mtab" onclick="switchMetric('lat')">Latency</button>
+    </div>
+    <div class="chart-grid" id="chart-grid"></div>
+  </div>
+
+</div>
+
+<script>
+const models   = ['Omni Phase1','Whisper tiny','Whisper base','Omni2-Qwen Mk1'];
+const datasets = ['AMI','CommonVoice','LibriSpeech','Switchboard','TED-LIUM'];
+const dsLabels = ['AMI','Common Voice','LibriSpeech','Switchboard','TED-LIUM'];
+
+const rawWER = {
+  'Omni Phase1':  [74.14, 34.72, 21.60, 112.68, 28.76],
+  'Whisper tiny': [85.79, 21.73, 23.04, 138.28, 28.23],
+  'Whisper base': [81.09, 16.91, 21.43, 162.56, 27.28],
+  'Omni2-Qwen Mk1': [104.66, 35.87, 7.75, 47.59, 18.36],
+};
+const normWER = {
+  'Omni Phase1':  [73.28, 22.72,  7.90, 106.78, 19.18],
+  'Whisper tiny': [55.32, 17.64,  9.69, 117.40, 15.58],
+  'Whisper base': [45.86, 13.40,  7.00, 139.91, 13.95],
+  'Omni2-Qwen Mk1': [104.57, 23.88, 6.72, 47.46, 17.40],
+};
+const latency = {
+  'Omni Phase1':  [0.278, 0.467, 1.144, 0.569, 1.097],
+  'Whisper tiny': [0.081, 0.206, 0.611, 0.247, 0.206],
+  'Whisper base': [0.133, 0.193, 0.728, 0.170, 0.280],
+  'Omni2-Qwen Mk1': [0.331, 0.477, 0.899, 0.549, 1.043],
+};
+
+const colors = {
+  'Omni Phase1':  '#2a78d6',
+  'Whisper tiny': '#eda100',
+  'Whisper base': '#4a3aa7',
+  'Omni2-Qwen Mk1': '#c0392b',
+};
+
+const MAX = { raw: 165, norm: 145, lat: 1.25 };
+
+function getBest(i, data) { return Math.min(...models.map(m => data[m][i])); }
+function getWorst(i, data){ return Math.max(...models.map(m => data[m][i])); }
+
+function buildTable(bodyId, data, maxVal, unit) {
+  const body = document.getElementById(bodyId);
+  body.innerHTML = '';
+  models.forEach(m => {
+    const tr = document.createElement('tr');
+    let html = `<td class="model-name" style="color:${colors[m]}">${m}</td>`;
+    datasets.forEach((ds, i) => {
+      const v    = data[m][i];
+      const best = getBest(i, data);
+      const worst= getWorst(i, data);
+      const pct  = Math.min((v / maxVal) * 100, 100);
+      const cls  = v === best ? 'best' : (v === worst ? 'worst' : '');
+      const disp = unit === 's' ? v.toFixed(3) : v.toFixed(1);
+      html += `<td><div class="bar-cell">
+        <span class="val ${cls}">${disp}</span>
+        <div class="bar-bg"><div class="bar-fill" style="width:${pct.toFixed(1)}%;background:${colors[m]}"></div></div>
+      </div></td>`;
+    });
+    tr.innerHTML = html;
+    body.appendChild(tr);
+  });
+}
+
+buildTable('norm-body', normWER, MAX.norm, '%');
+buildTable('raw-body',  rawWER,  MAX.raw,  '%');
+buildTable('lat-body',  latency, MAX.lat,  's');
+
+let chartInstances = [];
+let currentMetric  = 'norm';
+
+function metricData(key) {
+  if (key === 'raw')  return { data: rawWER,  suffix: '%' };
+  if (key === 'norm') return { data: normWER, suffix: '%' };
+  return                     { data: latency, suffix: 's' };
+}
+
+function buildCharts(metricKey) {
+  chartInstances.forEach(c => c.destroy());
+  chartInstances = [];
+  const grid = document.getElementById('chart-grid');
+  grid.innerHTML = '';
+  const { data, suffix } = metricData(metricKey);
+
+  datasets.forEach((ds, i) => {
+    const card = document.createElement('div');
+    card.className = 'chart-card';
+    card.innerHTML = `<div class="chart-title">${dsLabels[i]}</div><div class="chart-wrap"><canvas id="ch_${i}"></canvas></div>`;
+    grid.appendChild(card);
+
+    const inst = new Chart(document.getElementById('ch_' + i), {
+      type: 'bar',
+      data: {
+        labels: models,
+        datasets: [{
+          data: models.map(m => data[m][i]),
+          backgroundColor: models.map(m => colors[m] + 'dd'),
+          borderColor: models.map(m => colors[m]),
+          borderWidth: 1,
+          borderRadius: 4,
+          hoverBackgroundColor: models.map(m => colors[m]),
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: 'rgba(0,0,0,0.8)',
+            padding: 10,
+            callbacks: { label: c => ` ${c.parsed.y.toFixed(suffix==='s'?3:1)}${suffix}` }
+          }
+        },
+        scales: {
+          x: {
+            ticks: {
+              font: { size: 11 }, color: '#5a5a5a',
+              callback: function(val, idx) {
+                const parts = models[idx].split(' ');
+                return parts.length > 1 ? [parts[0], parts.slice(1).join(' ')] : parts[0];
+              }
+            },
+            grid: { display: false }
+          },
+          y: {
+            beginAtZero: true,
+            ticks: { font: { size: 11 }, color: '#898781', callback: v => v + suffix },
+            grid: { color: '#e1e0d9', borderDash: [4, 4] }
+          }
+        }
+      }
+    });
+    chartInstances.push(inst);
+  });
+}
+
+function switchMetric(key) {
+  currentMetric = key;
+  document.querySelectorAll('.mtab').forEach(t => t.classList.remove('active'));
+  document.querySelector(`.mtab[onclick="switchMetric('${key}')"]`).classList.add('active');
+  buildCharts(key);
+}
+
+function showTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('visible'));
+  document.getElementById('sec-' + name).classList.add('visible');
+  document.querySelector(`.tab[onclick="showTab('${name}')"]`).classList.add('active');
+  if (name === 'charts') buildCharts(currentMetric);
+}
+</script>
+</body>
+</html>
