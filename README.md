@@ -35,8 +35,13 @@ All local inferences and evaluations featured in these reports were conducted on
 
 ## 📁 Repository Structure
 
+* `index.html` - GitHub Pages entry point with links to all reports.
 * `transcription_report.html` - Interactive charts and tables detailing Word Error Rate (WER) and latency metrics.
 * `summarization_report.html` - Interactive charts, scatter plots, and tables detailing ROUGE scores, semantic similarity, and text compression rates.
+
+## 🚀 GitHub Pages Deployment
+
+This repository deploys to GitHub Pages from the `main` branch using the workflow at `.github/workflows/static.yml`.
 
 ---
 **Author:** Aditya Nagane  
