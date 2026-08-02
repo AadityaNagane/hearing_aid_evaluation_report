@@ -6,8 +6,8 @@ This repository hosts the interactive evaluation dashboards for the **Omni-Qwen*
 
 You can view the interactive data visualizations directly via GitHub Pages:
 
-* **[ASR Model Comparison](https://AadityaNagane.github.io/omni-qwen-evals/transcription_report.html)**: Evaluates the acoustic accuracy (Word Error Rate) of the Omni Phase 1 models against OpenAI's zero-shot Whisper baselines.
-* **[Summarization Evaluation](https://AadityaNagane.github.io/omni-qwen-evals/summarization_report.html)**: Compares the generative fidelity, semantic similarity, and compression rates of the end-to-end Omni-Qwen architecture against traditional cascaded pipelines (BERT, FLAN-T5, Qwen).
+* **[ASR Model Comparison](https://AadityaNagane.github.io/hearing_aid_evaluation_report/transcription_report.html)**: Evaluates the acoustic accuracy (Word Error Rate) of the Omni Phase 1 models against OpenAI's zero-shot Whisper baselines.
+* **[Summarization Evaluation](https://AadityaNagane.github.io/hearing_aid_evaluation_report/summerization_report.html)**: Compares the generative fidelity, semantic similarity, and compression rates of the end-to-end Omni-Qwen architecture against traditional cascaded pipelines (BERT, FLAN-T5, Qwen).
 
 ## 🧠 Project Architecture
 
